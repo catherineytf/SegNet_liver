@@ -156,15 +156,35 @@ def dice_loss(y_true, y_pred):
 def bce_dice_loss(y_true, y_pred):
     return binary_crossentropy(tf.cast(y_true, tf.float32), y_pred) + 0.5 * dice_loss(tf.cast(y_true, tf.float32), y_pred)
 
+from sklearn.metrics import confusion_matrix
+import numpy as np
+
 def calculate_tpr_fpr(y_true, y_pred):
     # Assuming y_pred is sigmoid output, threshold to get binary mask
     y_pred = y_pred > 0.5
     # Flatten the arrays to compute confusion matrix
     y_true_f = y_true.flatten()
     y_pred_f = y_pred.flatten()
-    tn, fp, fn, tp = confusion_matrix(y_true_f, y_pred_f).ravel()
-    tpr = tp / (tp + fn)
-    fpr = fp / (fp + tn)
+    
+    cm = confusion_matrix(y_true_f, y_pred_f).ravel()
+    
+    # Depending on the shape of the confusion matrix, unpack accordingly
+    if cm.shape[0] == 4:  # If we have a full 2x2 matrix
+        tn, fp, fn, tp = cm
+    elif cm.shape[0] == 1:  # If we only have one value, it means only one class was predicted
+        # Check which class is present
+        if np.unique(y_true_f).item() == 1:  # Only positives are present
+            tp = cm[0]
+            tn = fp = fn = 0
+        else:  # Only negatives are present
+            tn = cm[0]
+            tp = fp = fn = 0
+    else:  # This is for the case where the confusion matrix might be 2 elements long (only 2 out of tp, fp, tn, fn are present)
+        raise ValueError("Unexpected confusion matrix shape.")
+    
+    tpr = tp / (tp + fn) if (tp + fn) > 0 else 0  # Handling division by zero
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0  # Handling division by zero
+    
     return tpr, fpr
 
 
